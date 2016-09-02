@@ -152,13 +152,13 @@ def uniq_list(l):
     return OrderedDict.fromkeys(l).keys()
 
 def fqdn():
-    return socket.getfqdn()
+    return 'localhost:8069'
 
 @contextlib.contextmanager
 def local_pgadmin_cursor():
     cnx = None
     try:
-        cnx = psycopg2.connect("dbname=postgres")
+        cnx = psycopg2.connect("dbname=postgres user=ned_stark password=123 host=127.0.0.1")
         cnx.autocommit = True # required for admin commands
         yield cnx.cursor()
     finally:
@@ -314,8 +314,12 @@ class runbot_repo(osv.osv):
            WHERE b.repo_id = %s;
         """, ([r[0] for r in refs], repo.id))
         ref_branches = {r[0]: r[1] for r in cr.fetchall()}
-
         for name, sha, date, author, author_email, subject, committer, committer_email in refs:
+            # skip build for old branches
+            data = dateutil.parser.parse(date[:19]) + datetime.timedelta(3)
+            if data < datetime.datetime.now():
+                continue
+
             # create or get branch
             if ref_branches.get(name):
                 branch_id = ref_branches[name]
@@ -323,9 +327,7 @@ class runbot_repo(osv.osv):
                 _logger.debug('repo %s found new branch %s', repo.name, name)
                 branch_id = Branch.create(cr, uid, {'repo_id': repo.id, 'name': name})
             branch = Branch.browse(cr, uid, [branch_id], context=context)[0]
-            # skip build for old branches
-            if dateutil.parser.parse(date[:19]) + datetime.timedelta(30) < datetime.datetime.now():
-                continue
+
             # create build (and mark previous builds as skipped) if not found
             build_ids = Build.search(cr, uid, [('branch_id', '=', branch.id), ('name', '=', sha)])
             if not build_ids:
@@ -603,9 +605,9 @@ class runbot_build(osv.osv):
 
         # detect duplicate
         domain = [
-            ('repo_id','=',build.repo_id.duplicate_id.id), 
-            ('name', '=', build.name), 
-            ('duplicate_id', '=', False), 
+            ('repo_id','=',build.repo_id.duplicate_id.id),
+            ('name', '=', build.name),
+            ('duplicate_id', '=', False),
             '|', ('result', '=', False), ('result', '!=', 'skipped')
         ]
         duplicate_ids = self.search(cr, uid, domain, context=context)
@@ -879,6 +881,10 @@ class runbot_build(osv.osv):
             cmd = [
                 sys.executable,
                 server_path,
+                "--db_host=localhost",
+                "--db_user=ned_stark",
+                "--db_password=123",
+                "--db_port=5432",
                 "--xmlrpc-port=%d" % build.port,
             ]
             # options
@@ -1237,7 +1243,7 @@ class RunbotController(http.Controller):
         repo_ids = repo_obj.search(cr, uid, [])
         repos = repo_obj.browse(cr, uid, repo_ids)
         if not repo and repos:
-            repo = repos[0] 
+            repo = repos[0]
 
         context = {
             'repos': repos,
@@ -1271,20 +1277,20 @@ class RunbotController(http.Controller):
                 branch_ids = uniq_list(sticky_branch_ids + [br[0] for br in cr.fetchall()])
 
                 build_query = """
-                    SELECT 
-                        branch_id, 
+                    SELECT
+                        branch_id,
                         max(case when br_bu.row = 1 then br_bu.build_id end),
                         max(case when br_bu.row = 2 then br_bu.build_id end),
                         max(case when br_bu.row = 3 then br_bu.build_id end),
                         max(case when br_bu.row = 4 then br_bu.build_id end)
                     FROM (
-                        SELECT 
-                            br.id AS branch_id, 
+                        SELECT
+                            br.id AS branch_id,
                             bu.id AS build_id,
                             row_number() OVER (PARTITION BY branch_id) AS row
-                        FROM 
-                            runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id 
-                        WHERE 
+                        FROM
+                            runbot_branch br INNER JOIN runbot_build bu ON br.id=bu.branch_id
+                        WHERE
                             br.id in %s
                         GROUP BY br.id, bu.id
                         ORDER BY br.id, bu.id DESC
