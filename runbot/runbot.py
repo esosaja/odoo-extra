@@ -152,13 +152,13 @@ def uniq_list(l):
     return OrderedDict.fromkeys(l).keys()
 
 def fqdn():
-    return 'localhost:8069'
+    return 'kingslanding:8069'
 
 @contextlib.contextmanager
 def local_pgadmin_cursor():
     cnx = None
     try:
-        cnx = psycopg2.connect("dbname=postgres user=ned_stark password=123 host=127.0.0.1")
+        cnx = psycopg2.connect("dbname=postgres user=odoo password=123 host=127.0.0.1")
         cnx.autocommit = True # required for admin commands
         yield cnx.cursor()
     finally:
@@ -882,7 +882,7 @@ class runbot_build(osv.osv):
                 sys.executable,
                 server_path,
                 "--db_host=localhost",
-                "--db_user=ned_stark",
+                "--db_user=odoo",
                 "--db_password=123",
                 "--db_port=5432",
                 "--xmlrpc-port=%d" % build.port,
