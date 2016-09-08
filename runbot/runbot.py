@@ -152,7 +152,7 @@ def uniq_list(l):
     return OrderedDict.fromkeys(l).keys()
 
 def fqdn():
-    return 'kingslanding:8069'
+    return 'kingslanding'
 
 @contextlib.contextmanager
 def local_pgadmin_cursor():
