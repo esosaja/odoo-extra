@@ -931,7 +931,10 @@ class runbot_build(osv.osv):
             lock(lock_path)
         out=open(log_path,"w")
         _logger.debug("spawn: %s stdout: %s", ' '.join(cmd), log_path)
-        p=subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell)
+        import os
+        my_env = os.environ.copy()
+        my_env['LANG'] = 'pt_BR.UTF-8'
+        p=subprocess.Popen(cmd, stdout=out, stderr=out, preexec_fn=preexec_fn, shell=shell, env=my_env)
         return p.pid
 
     def github_status(self, cr, uid, ids, context=None):
