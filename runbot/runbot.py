@@ -872,13 +872,7 @@ class runbot_build(osv.osv):
         """Return a list describing the command to start the build"""
         for build in self.browse(cr, uid, ids, context=context):
             # Server
-            server_path = build.path("openerp-server")
-            # for 7.0
-            if not os.path.isfile(server_path):
-                server_path = build.path("openerp-server.py")
-            # for 6.0 branches
-            if not os.path.isfile(server_path):
-                server_path = build.path("bin/openerp-server.py")
+            server_path = build.path("odoo-bin")
 
             # commandline
             cmd = [
